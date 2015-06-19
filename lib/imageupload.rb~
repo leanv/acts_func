@@ -1,0 +1,106 @@
+class Imageupload
+  #初始化
+  #临时路径
+  #图片路径
+  #清理垃圾,=0不清理
+  def initialize(minsize=10, maxsize=400, snappath="app/assets/images/snap/", imagepath="app/assets/images/upload/", cleartime=10, bigpath="app/assets/images/upload/")
+    @minsize = minsize*1024
+    @maxsize = maxsize*1024
+    @snappath = snappath
+    @imagepath = imagepath
+    @cleartime = cleartime
+    @bigpath = bigpath
+    @message=""
+  end
+
+  #忽略高宽就是自定义大小，传原图到临时空间
+  def upload(imgfile, rw=0, rh=0, dw=0, dh=0)
+    if self.img_validata(imgfile)
+      sname = self.getname(imgfile.original_filename)
+      imgpath = rw==0 || rh==0 ? @snappath+sname : @imagepath+sname
+      File.open(imgpath, "wb") do |f|
+        f.write(imgfile.read)
+      end
+      if @cleartime>0
+        self.clearsnap(sname)
+      end
+      if rw==0 || rh==0
+        return sname
+      else
+        self.resize(rw, rh, sname, dw, dh)
+      end
+    end
+  end
+
+  #自定义剪裁缩放
+  def reimage(x, y, w, h, rw, rh, pname)
+    imgsnap = @snappath+pname
+    imgp = @imagepath+pname
+    img = Magick::Image.read(imgsnap)[0]
+    if w==0 || h==0
+      rc = img.resize(rw, rh)
+      rc.write(imgp)
+    else
+      chopped = img.crop(x, y, w, h)
+      rc = chopped.resize(rw, rh)
+      rc.write(imgp)
+    end
+    File.delete(imgsnap)
+  end
+
+  #错误提示
+  def message
+    @message
+  end
+
+  #固定剪裁缩放
+  def resize(rw, rh, imgname, dw, dh)
+    img = Magick::Image.read(@imagepath+imgname)[0]
+    newimg = img.resize_to_fill(rw, rh)
+    newimg.write(@imagepath+imgname)
+    if dw!=0 && dh !=0
+      name= imgname[0, imgname.length-4]
+      format= imgname[imgname.length-4, 4]
+      bigimg=img.resize_to_fill(dw, dh)
+      bigimg.write(@bigpath+name+"b"+format)
+    end
+  end
+
+  #大小限制，类型限制，都放进模型层中。
+  def img_validata(img_file)
+    img_for = /\.(jpg|gif|GIF|png|jpeg|bmp|BMP|JPG|JPEG|PNG)+$/.match(img_file.original_filename)
+    if img_for.nil? || img_for.blank?
+      @message="错误：图片格式不对，只允许上传jpg,gif,png,bmp,jpeg格式！\\n"
+      return false
+    end
+    if img_file.size<@minsize || img_file.size>@maxsize
+      @message="错误：图片大小错误，只允许#{@minsize}kb~#{@maxsize}kb！\\n"
+      return false
+    end
+    return true
+  end
+
+  #保证名称不重复
+  def getname(img_file)
+    img_for = img_file[img_file.length-4, 4]
+    filename = Time.now.strftime("%Y%m%d%h%m%s")<<rand(99999).to_s<<img_for
+    file = @imagepath+filename
+    while File.exist?(file) do
+      filename = Time.now.strftime("%Y%m%d%h%m%s")<<rand(99999).to_s<<img_for
+      file = @imagepath+filename
+    end
+    filename
+  end
+
+  #删除原图
+  def clearsnap(snapname)
+    Thread.new do
+      snapimg = @snappath+snapname
+      sleep @cleartime
+      if File.exist?(snapimg)
+        File.delete(snapimg)
+      end
+      Thread.current.kill
+    end
+  end
+end
