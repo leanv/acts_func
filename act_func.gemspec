@@ -7,7 +7,7 @@ Gem::Specification.new do |s|
   s.authors     = ["lean"]
   s.email       = '54850915@qq.com' 
   s.files       = `git ls-files`.split("\n")
-  s.extra_rdoc_files = ['README.rdoc']
+  s.extra_rdoc_files = ['README.md']
   s.require_paths = ['lib']
   s.add_dependency 'iconv', ['>= 0']
   s.add_dependency 'rmagick', ['>= 0']
